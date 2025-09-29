@@ -18,8 +18,7 @@ export interface User {
 export interface ExerciseSet {
   id: number;
   weight: number;
-  reps: number;
-  rpe?: number;
+  reps: string;
   isDone: boolean;
 }
 
@@ -41,6 +40,7 @@ export interface Workout {
   name: string;
   description: string;
   exercises: Exercise[];
+  isArchived?: boolean;
 }
 
 export interface Alert {

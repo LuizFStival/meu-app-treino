@@ -1,13 +1,31 @@
 
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Screen, User, Workout, Alert, Measurement, Exercise, ExerciseSet, ExerciseProgress, MuscleGroupVolume, ProgressDataPoint, CompletedWorkout } from './types';
 import { MOCK_USER, MOCK_WORKOUTS, MOCK_ALERTS, MOCK_MEASUREMENTS, MOCK_PROGRESS_SUPINO, MOCK_PROGRESS_AGACHAMENTO, MOCK_MUSCLE_GROUP_VOLUME, ICONS } from './constants';
+import { GoogleGenAI, Type } from "@google/genai";
 
 const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
+// FIX: Removed explicit type on `sum` in `reduce`. The initial value `0` allows TypeScript to correctly infer `sum` as a number, resolving the type errors.
+const parseRepsStringToNumber = (reps: string): number => {
+    if (!reps || typeof reps !== 'string') return 0;
+    const numbers = reps.match(/\d+/g) || [];
+    return numbers.reduce((sum, num) => sum + parseInt(num, 10), 0);
+};
+
+const debounce = (func: (...args: any[]) => void, delay: number) => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    return (...args: any[]) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+            func(...args);
+        }, delay);
+    };
 };
 
 const Header = ({ user }: { user: User }) => (
@@ -62,36 +80,130 @@ const HomeScreen = ({ user, workout, alerts, onStartWorkout, onNavigate }: { use
     );
 };
 
-const WorkoutsListScreen = ({ workouts, onStartWorkout, onAddNewWorkout, onEditWorkout }: { workouts: Workout[], onStartWorkout: (w: Workout) => void, onAddNewWorkout: () => void, onEditWorkout: (w: Workout) => void }) => (
-    <div className="p-4 text-white flex flex-col h-full">
-        <h1 className="text-3xl font-bold mb-4">Meus Treinos</h1>
-        <div className="flex-grow overflow-y-auto space-y-4 pr-2">
-            {workouts.map(w => (
-                <div key={w.id} className="bg-slate-900/70 border border-slate-700 p-4 rounded-xl flex justify-between items-center">
-                    <div>
-                        <h3 className="font-bold text-lg text-slate-100">{w.name}</h3>
-                        <p className="text-sm text-slate-400">{w.description}</p>
+const WorkoutsListScreen = ({ workouts, onStartWorkout, onAddNewWorkout, onEditWorkout, onDeleteWorkout, onArchiveWorkout }: { workouts: Workout[], onStartWorkout: (w: Workout) => void, onAddNewWorkout: () => void, onEditWorkout: (w: Workout) => void, onDeleteWorkout: (id: string) => void, onArchiveWorkout: (id: string, archive: boolean) => void }) => {
+    const [view, setView] = useState<'active' | 'archived'>('active');
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    const activeWorkouts = workouts.filter(w => !w.isArchived);
+    const archivedWorkouts = workouts.filter(w => w.isArchived);
+    const workoutsToShow = view === 'active' ? activeWorkouts : archivedWorkouts;
+
+    const toggleMenu = (id: string) => {
+        setOpenMenuId(prevId => (prevId === id ? null : id));
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setOpenMenuId(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+    
+    return (
+        <div className="p-4 text-white flex flex-col h-full">
+            <h1 className="text-3xl font-bold mb-4">Meus Treinos</h1>
+            <div className="flex space-x-2 mb-4 bg-slate-900/70 p-1 rounded-lg border border-slate-700">
+                <button onClick={() => setView('active')} className={`flex-1 p-2 rounded-md text-sm transition-colors ${view === 'active' ? 'bg-cyan-600' : 'hover:bg-slate-800'}`}>Ativos</button>
+                <button onClick={() => setView('archived')} className={`flex-1 p-2 rounded-md text-sm transition-colors ${view === 'archived' ? 'bg-cyan-600' : 'hover:bg-slate-800'}`}>Arquivados</button>
+            </div>
+            <div className="flex-grow overflow-y-auto space-y-4 pr-2">
+                {workoutsToShow.length > 0 ? workoutsToShow.map(w => (
+                    <div key={w.id} className="bg-slate-900/70 border border-slate-700 p-4 rounded-xl flex justify-between items-center">
+                        <div>
+                            <h3 className="font-bold text-lg text-slate-100">{w.name}</h3>
+                            <p className="text-sm text-slate-400">{w.description}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            {view === 'active' && (
+                                <button onClick={() => onStartWorkout(w)} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg">
+                                    Iniciar
+                                </button>
+                            )}
+                            <div className="relative" ref={openMenuId === w.id ? menuRef : null}>
+                                <button onClick={() => toggleMenu(w.id)} className="text-slate-400 hover:text-cyan-400 p-2 rounded-lg -mr-2">
+                                    <ICONS.MORE_VERTICAL className="w-5 h-5" />
+                                </button>
+                                {openMenuId === w.id && (
+                                    <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-20 py-1">
+                                        {view === 'active' ? (
+                                            <>
+                                                <button onClick={() => { onEditWorkout(w); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center"><ICONS.EDIT className="w-4 h-4 mr-3" /> Editar</button>
+                                                <button onClick={() => { onArchiveWorkout(w.id, true); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center"><ICONS.ARCHIVE className="w-4 h-4 mr-3" /> Arquivar</button>
+                                            </>
+                                        ) : (
+                                            <button onClick={() => { onArchiveWorkout(w.id, false); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center"><ICONS.UNARCHIVE className="w-4 h-4 mr-3" /> Desarquivar</button>
+                                        )}
+                                        <div className="my-1 h-px bg-slate-700"></div>
+                                        <button onClick={() => { onDeleteWorkout(w.id); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-slate-700 flex items-center"><ICONS.TRASH className="w-4 h-4 mr-3" /> Excluir</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                        <button onClick={() => onEditWorkout(w)} className="text-slate-400 hover:text-cyan-400 p-2 rounded-lg">
-                            <ICONS.EDIT className="w-5 h-5" />
-                        </button>
-                        <button onClick={() => onStartWorkout(w)} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg">
-                            Iniciar
-                        </button>
+                )) : (
+                     <div className="text-center text-slate-400 mt-16 p-4 bg-slate-900/70 border border-slate-700 rounded-xl">
+                        <p className="font-semibold text-slate-200">Nenhum Treino Aqui</p>
+                        <p className="text-sm">{view === 'active' ? 'Crie um novo treino ou desarquive um existente.' : 'Nenhum treino foi arquivado ainda.'}</p>
                     </div>
-                </div>
-            ))}
+                )}
+            </div>
+             {view === 'active' && (
+                <button onClick={onAddNewWorkout} className="w-full bg-slate-800 hover:bg-slate-700 font-bold py-3 mt-4 rounded-xl transition-all duration-300 flex items-center justify-center border border-slate-600">
+                    <ICONS.PLUS className="w-5 h-5 mr-2" /> Criar Novo Treino
+                </button>
+            )}
         </div>
-        <button onClick={onAddNewWorkout} className="w-full bg-slate-800 hover:bg-slate-700 font-bold py-3 mt-4 rounded-xl transition-all duration-300 flex items-center justify-center border border-slate-600">
-            <ICONS.PLUS className="w-5 h-5 mr-2" /> Criar Novo Treino
-        </button>
-    </div>
-);
+    );
+};
+
 
 const EditWorkoutScreen = ({ workout, onSave, onCancel }: { workout: Workout, onSave: (w: Workout) => void, onCancel: () => void }) => {
     const [editedWorkout, setEditedWorkout] = useState(workout);
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [isSuggesting, setIsSuggesting] = useState(false);
+    const [activeSuggestionBox, setActiveSuggestionBox] = useState<string | null>(null);
 
+    const fetchSuggestions = useCallback(async (query: string) => {
+        if (query.length < 3) {
+            setSuggestions([]);
+            return;
+        }
+        setIsSuggesting(true);
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: `Liste até 5 nomes de exercícios de academia comuns em português que comecem com ou sejam relacionados a "${query}".`,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING },
+                    },
+                },
+            });
+            const suggestionsArray = JSON.parse(response.text);
+            setSuggestions(suggestionsArray);
+        } catch (error) {
+            console.error("Error fetching exercise suggestions:", error);
+            setSuggestions([]);
+        } finally {
+            setIsSuggesting(false);
+        }
+    }, []);
+
+    const debouncedFetch = useRef(debounce((query: string) => fetchSuggestions(query), 500)).current;
+
+    const handleExerciseNameChange = (exerciseId: string, value: string) => {
+        handleExerciseFieldChange(exerciseId, 'name', value);
+        setActiveSuggestionBox(exerciseId);
+        debouncedFetch(value);
+    };
+    
     const handleFieldChange = (field: 'name' | 'description', value: string) => {
         setEditedWorkout(prev => ({...prev, [field]: value }));
     };
@@ -113,7 +225,7 @@ const EditWorkoutScreen = ({ workout, onSave, onCancel }: { workout: Workout, on
     };
 
     const handleAddExercise = () => {
-        const newExercise: Exercise = { id: `ex${Date.now()}`, name: "Novo Exercício", lastLoad: 0, muscleGroup: "N/A", sets: [{id: 1, weight: 0, reps: 10, isDone: false}] };
+        const newExercise: Exercise = { id: `ex${Date.now()}`, name: "", lastLoad: 0, muscleGroup: "N/A", sets: [{id: 1, weight: 0, reps: '10', isDone: false}] };
         setEditedWorkout(prev => ({
             ...prev,
             exercises: [...prev.exercises, newExercise]
@@ -121,23 +233,27 @@ const EditWorkoutScreen = ({ workout, onSave, onCancel }: { workout: Workout, on
     };
 
     const handleSetChange = (exerciseId: string, setId: number, field: 'weight' | 'reps', value: string) => {
-        const numericValue = parseInt(value, 10) || 0;
         setEditedWorkout(prev => ({
             ...prev,
-            exercises: prev.exercises.map(ex =>
-                ex.id === exerciseId
-                    ? { ...ex, sets: ex.sets.map(s => s.id === setId ? { ...s, [field]: numericValue } : s) }
-                    : ex
-            )
+            exercises: prev.exercises.map(ex => {
+                if (ex.id !== exerciseId) return ex;
+                const newSets = ex.sets.map(s => {
+                    if (s.id !== setId) return s;
+                    if (field === 'weight') return { ...s, weight: parseInt(value, 10) || 0 };
+                    return { ...s, reps: value };
+                });
+                return { ...ex, sets: newSets };
+            })
         }));
     };
+    
 
     const handleAddSet = (exerciseId: string) => {
         setEditedWorkout(prev => ({
             ...prev,
             exercises: prev.exercises.map(ex => {
                 if (ex.id !== exerciseId) return ex;
-                const lastSet = ex.sets[ex.sets.length - 1] || { id: 0, weight: 0, reps: 0, isDone: false };
+                const lastSet = ex.sets[ex.sets.length - 1] || { id: 0, weight: 0, reps: '0', isDone: false };
                 const newSet: ExerciseSet = { ...lastSet, id: Date.now(), isDone: false };
                 return { ...ex, sets: [...ex.sets, newSet] };
             })
@@ -155,6 +271,21 @@ const EditWorkoutScreen = ({ workout, onSave, onCancel }: { workout: Workout, on
         }));
     };
 
+    const handleMoveExercise = (index: number, direction: 'up' | 'down') => {
+        setEditedWorkout(prev => {
+            const exercises = [...prev.exercises];
+            const newIndex = direction === 'up' ? index - 1 : index + 1;
+            
+            if (newIndex < 0 || newIndex >= exercises.length) {
+                return prev;
+            }
+            
+            const [movedExercise] = exercises.splice(index, 1);
+            exercises.splice(newIndex, 0, movedExercise);
+            
+            return { ...prev, exercises };
+        });
+    };
 
     return (
         <div className="p-4 text-white flex flex-col h-full">
@@ -167,25 +298,57 @@ const EditWorkoutScreen = ({ workout, onSave, onCancel }: { workout: Workout, on
             <div className="flex-grow overflow-y-auto space-y-4 pr-2">
                 <div className="bg-slate-900/70 p-4 rounded-xl border border-slate-700">
                     <label className="text-sm text-slate-400">Nome do Treino</label>
-                    <input type="text" value={editedWorkout.name} onChange={e => handleFieldChange('name', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded p-2 mt-1 text-slate-100" />
+                    <input type="text" value={editedWorkout.name} onChange={e => handleFieldChange('name', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded p-2 mt-1 text-slate-100" placeholder="Nome do Treino" />
                     <label className="text-sm text-slate-400 mt-3 block">Descrição</label>
-                    <input type="text" value={editedWorkout.description} onChange={e => handleFieldChange('description', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded p-2 mt-1 text-slate-100" />
+                    <input type="text" value={editedWorkout.description} onChange={e => handleFieldChange('description', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded p-2 mt-1 text-slate-100" placeholder="Descrição (ex: Peito e Tríceps)" />
                 </div>
                 <div>
                     <h2 className="text-xl font-semibold mb-2">Exercícios</h2>
                     <div className="space-y-3">
-                         {editedWorkout.exercises.map(ex => (
+                         {editedWorkout.exercises.map((ex, exIndex) => (
                             <div key={ex.id} className="bg-slate-900/70 p-3 rounded-lg border border-slate-700">
                                 <div className="flex items-center justify-between">
-                                    <input 
-                                        type="text" 
-                                        value={ex.name}
-                                        onChange={e => handleExerciseFieldChange(ex.id, 'name', e.target.value)}
-                                        className="bg-transparent font-semibold text-slate-200 w-full focus:outline-none focus:text-cyan-400" 
-                                    />
-                                    <button onClick={() => handleDeleteExercise(ex.id)} className="text-slate-500 hover:text-red-500 ml-2 p-1">
-                                        <ICONS.TRASH className="w-5 h-5" />
-                                    </button>
+                                    <div className="flex-grow mr-2 relative">
+                                        <input 
+                                            type="text" 
+                                            value={ex.name}
+                                            placeholder="Nome do Exercício"
+                                            onChange={e => handleExerciseNameChange(ex.id, e.target.value)}
+                                            onBlur={() => setTimeout(() => setActiveSuggestionBox(null), 200)}
+                                            className="bg-transparent font-semibold text-slate-200 w-full focus:outline-none focus:text-cyan-400" 
+                                        />
+                                        {activeSuggestionBox === ex.id && (isSuggesting || suggestions.length > 0) && (
+                                            <div className="absolute top-full left-0 right-0 bg-slate-800 border border-slate-700 rounded-b-lg shadow-lg z-10 mt-1">
+                                                {isSuggesting && <div className="p-2 text-slate-400 text-sm">Buscando...</div>}
+                                                {suggestions.map(s => (
+                                                    <div 
+                                                        key={s} 
+                                                        onMouseDown={() => {
+                                                            handleExerciseFieldChange(ex.id, 'name', s);
+                                                            setActiveSuggestionBox(null);
+                                                            setSuggestions([]);
+                                                        }}
+                                                        className="p-2 hover:bg-slate-700 cursor-pointer text-slate-200"
+                                                    >
+                                                        {s}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center">
+                                        <div className="flex flex-col -my-1">
+                                            <button onClick={() => handleMoveExercise(exIndex, 'up')} className="text-slate-500 hover:text-cyan-400 disabled:opacity-30 disabled:cursor-not-allowed p-1" disabled={exIndex === 0} aria-label="Mover exercício para cima" >
+                                                <ICONS.CHEVRON_UP className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => handleMoveExercise(exIndex, 'down')} className="text-slate-500 hover:text-cyan-400 disabled:opacity-30 disabled:cursor-not-allowed p-1" disabled={exIndex === editedWorkout.exercises.length - 1} aria-label="Mover exercício para baixo">
+                                                <ICONS.CHEVRON_DOWN className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        <button onClick={() => handleDeleteExercise(ex.id)} className="text-slate-500 hover:text-red-500 ml-1 p-1">
+                                            <ICONS.TRASH className="w-5 h-5" />
+                                        </button>
+                                    </div>
                                 </div>
                                 
                                 <div className="mt-4 space-y-2">
@@ -199,10 +362,10 @@ const EditWorkoutScreen = ({ workout, onSave, onCancel }: { workout: Workout, on
                                         <div key={set.id} className="grid grid-cols-12 gap-2 items-center text-center">
                                             <span className="font-bold col-span-2 text-sm">{setIndex + 1}</span>
                                             <div className="col-span-4">
-                                                <input type="number" value={set.weight || ''} onChange={e => handleSetChange(ex.id, set.id, 'weight', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded p-1 text-center" />
+                                                <input type="tel" inputMode="numeric" value={set.weight || ''} onChange={e => handleSetChange(ex.id, set.id, 'weight', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded p-1 text-center" />
                                             </div>
                                             <div className="col-span-4">
-                                                <input type="number" value={set.reps || ''} onChange={e => handleSetChange(ex.id, set.id, 'reps', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded p-1 text-center" />
+                                                <input type="text" value={set.reps || ''} onChange={e => handleSetChange(ex.id, set.id, 'reps', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded p-1 text-center" />
                                             </div>
                                             <div className="col-span-2 flex justify-center">
                                                 <button onClick={() => handleDeleteSet(ex.id, set.id)} className="text-slate-500 hover:text-red-500 p-1">
@@ -217,7 +380,8 @@ const EditWorkoutScreen = ({ workout, onSave, onCancel }: { workout: Workout, on
                                 <div className="mt-3">
                                     <label className="text-xs text-slate-400">Descanso (s)</label>
                                     <input 
-                                        type="number" 
+                                        type="tel" 
+                                        inputMode="numeric"
                                         placeholder="Padrão"
                                         value={ex.restTime || ''}
                                         onChange={e => handleExerciseFieldChange(ex.id, 'restTime', parseInt(e.target.value) || undefined)}
@@ -242,10 +406,36 @@ const EditWorkoutScreen = ({ workout, onSave, onCancel }: { workout: Workout, on
 
 const WorkoutScreen = ({ workout, setWorkout, onFinishWorkout, globalSettings, workoutStartTime }: { workout: Workout, setWorkout: (w: Workout) => void, onFinishWorkout: () => void, globalSettings: { defaultRestTime: number }, workoutStartTime: number | null }) => {
     const [timer, setTimer] = useState<number | null>(null);
+    const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
     const [restingExercise, setRestingExercise] = useState<string | null>(null);
     const [elapsedTime, setElapsedTime] = useState(0);
     const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [showInactivityAlert, setShowInactivityAlert] = useState(false);
+    const wakeLockRef = useRef<any | null>(null);
+
+    // Screen Wake Lock Effect
+    useEffect(() => {
+        const acquireWakeLock = async () => {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLockRef.current = await navigator.wakeLock.request('screen');
+                    console.log('Screen Wake Lock acquired.');
+                } catch (err) {
+                    console.error(`Could not acquire Wake Lock: ${err.name}, ${err.message}`);
+                }
+            }
+        };
+
+        acquireWakeLock();
+
+        return () => {
+            if (wakeLockRef.current) {
+                wakeLockRef.current.release();
+                wakeLockRef.current = null;
+                console.log('Screen Wake Lock released.');
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (!workoutStartTime) return;
@@ -264,30 +454,35 @@ const WorkoutScreen = ({ workout, setWorkout, onFinishWorkout, globalSettings, w
         };
     }, []);
 
+    // Accurate Timer Effect
     useEffect(() => {
-        if (timer === null) {
+        if (timerEndTime === null) {
             if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+            setTimer(null);
             return;
         }
 
-        if (timer <= 0) {
-            setRestingExercise(null);
-            if (timer !== null) setTimer(null);
-            
-            // Start inactivity timer when rest is over
-            inactivityTimerRef.current = setTimeout(() => {
-                if (navigator.vibrate) {
-                    navigator.vibrate([200, 100, 200, 100, 200]);
-                }
-                setShowInactivityAlert(true);
-            }, 120000); // 2 minutes
+        const interval = setInterval(() => {
+            const remaining = Math.round((timerEndTime - Date.now()) / 1000);
+            if (remaining <= 0) {
+                setTimer(0);
+                setTimerEndTime(null);
+                setRestingExercise(null);
 
-            return;
-        }
+                // Start inactivity timer when rest is over
+                inactivityTimerRef.current = setTimeout(() => {
+                    if (navigator.vibrate) {
+                        navigator.vibrate([200, 100, 200, 100, 200]);
+                    }
+                    setShowInactivityAlert(true);
+                }, 120000); // 2 minutes
+            } else {
+                setTimer(remaining);
+            }
+        }, 500);
 
-        const interval = setInterval(() => setTimer(t => t! - 1), 1000);
         return () => clearInterval(interval);
-    }, [timer]);
+    }, [timerEndTime]);
 
     const handleUpdateExercise = (updatedExercise: Exercise) => {
         setWorkout({
@@ -296,18 +491,19 @@ const WorkoutScreen = ({ workout, setWorkout, onFinishWorkout, globalSettings, w
         });
     };
     
-    const handleSetFieldChange = (exerciseId: string, setId: number, field: 'weight' | 'reps' | 'rpe', value: string) => {
+    const handleSetFieldChange = (exerciseId: string, setId: number, field: 'weight' | 'reps', value: string) => {
         const exercise = workout.exercises.find(ex => ex.id === exerciseId);
         if (!exercise) return;
 
         const updatedSets = exercise.sets.map(s => {
             if (s.id === setId) {
-                const numericValue = parseFloat(value);
-                if (field === 'rpe') {
-                     const intValue = parseInt(value, 10);
-                    return { ...s, rpe: isNaN(intValue) ? undefined : intValue };
+                if (field === 'weight') {
+                    const numericValue = parseFloat(value);
+                    return { ...s, weight: isNaN(numericValue) ? 0 : numericValue };
                 }
-                return { ...s, [field]: isNaN(numericValue) ? 0 : numericValue };
+                if (field === 'reps') {
+                    return { ...s, reps: value };
+                }
             }
             return s;
         });
@@ -315,23 +511,22 @@ const WorkoutScreen = ({ workout, setWorkout, onFinishWorkout, globalSettings, w
     };
 
     const handleSetDone = (exerciseId: string, setId: number) => {
-        // Clear any pending inactivity timer
-        if (inactivityTimerRef.current) {
-            clearTimeout(inactivityTimerRef.current);
-        }
+        if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
         setShowInactivityAlert(false);
 
         const exercise = workout.exercises.find(ex => ex.id === exerciseId)!;
         const newSets = exercise.sets.map(s => s.id === setId ? { ...s, isDone: !s.isDone } : s);
         handleUpdateExercise({ ...exercise, sets: newSets });
+
         const restTime = exercise.restTime ?? globalSettings.defaultRestTime;
         setTimer(restTime);
+        setTimerEndTime(Date.now() + restTime * 1000);
         setRestingExercise(exercise.name);
     };
 
     const handleAddSet = (exerciseId: string) => {
         const exercise = workout.exercises.find(ex => ex.id === exerciseId)!;
-        const lastSet = exercise.sets[exercise.sets.length - 1] || { id: 0, weight: 0, reps: 0, isDone: false };
+        const lastSet = exercise.sets[exercise.sets.length - 1] || { id: 0, weight: 0, reps: '0', isDone: false };
         const newSet: ExerciseSet = { ...lastSet, id: Date.now(), isDone: false };
         handleUpdateExercise({ ...exercise, sets: [...exercise.sets, newSet] });
     };
@@ -345,6 +540,17 @@ const WorkoutScreen = ({ workout, setWorkout, onFinishWorkout, globalSettings, w
     
     const totalSets = workout.exercises.reduce((acc, ex) => acc + ex.sets.length, 0);
     const completedSets = workout.exercises.reduce((acc, ex) => acc + ex.sets.filter(s => s.isDone).length, 0);
+
+    const adjustTimer = (seconds: number) => {
+        if (timerEndTime) {
+            setTimerEndTime(t => t! + seconds * 1000);
+        }
+    };
+    
+    const skipTimer = () => {
+        setTimer(0);
+        setTimerEndTime(null);
+    };
 
     return (
         <div className="p-4 text-white flex flex-col h-full">
@@ -373,21 +579,19 @@ const WorkoutScreen = ({ workout, setWorkout, onFinishWorkout, globalSettings, w
                             <h3 className="font-bold text-lg text-slate-100">{ex.name}</h3>
                             <p className="text-sm text-slate-400">Última: {ex.lastLoad} kg</p>
                         </div>
-                        <div className="grid grid-cols-12 gap-2 text-center text-sm font-semibold text-slate-400 mb-2 px-2">
+                        <div className="grid grid-cols-11 gap-2 text-center text-sm font-semibold text-slate-400 mb-2 px-2">
                             <span className="col-span-1">S</span>
                             <span className="col-span-4">Peso (kg)</span>
-                            <span className="col-span-3">Reps</span>
-                            <span className="col-span-2">RPE</span>
+                            <span className="col-span-4">Reps</span>
                             <span className="col-span-2"></span>
                         </div>
                         {ex.sets.map((set, setIndex) => (
-                            <div key={set.id} className={`grid grid-cols-12 gap-2 items-center text-center p-2 rounded-lg ${set.isDone ? 'bg-green-500/10' : ''}`}>
+                            <div key={set.id} className={`grid grid-cols-11 gap-2 items-center text-center p-2 rounded-lg ${set.isDone ? 'bg-green-500/10' : ''}`}>
                                 <span className="font-bold col-span-1">{setIndex + 1}</span>
                                 <div className="col-span-4">
-                                <input type="number" value={set.weight || ''} onChange={e => handleSetFieldChange(ex.id, set.id, 'weight', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded p-1 text-center" />
+                                <input type="tel" inputMode="numeric" value={set.weight || ''} onChange={e => handleSetFieldChange(ex.id, set.id, 'weight', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded p-1 text-center" />
                                 </div>
-                                <input type="number" value={set.reps || ''} onChange={e => handleSetFieldChange(ex.id, set.id, 'reps', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded p-1 text-center col-span-3" />
-                                <input type="number" placeholder="-" value={set.rpe ?? ''} onChange={e => handleSetFieldChange(ex.id, set.id, 'rpe', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded p-1 text-center col-span-2" />
+                                <input type="text" value={set.reps || ''} onChange={e => handleSetFieldChange(ex.id, set.id, 'reps', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded p-1 text-center col-span-4" />
                                 <div className="col-span-2 flex items-center justify-center space-x-1">
                                     <button onClick={() => handleSetDone(ex.id, set.id)} className={`w-8 h-8 rounded-full flex items-center justify-center ${set.isDone ? 'bg-green-500' : 'border-2 border-cyan-500'}`}>
                                         {set.isDone && <ICONS.CHECK className="w-5 h-5" />}
@@ -411,11 +615,11 @@ const WorkoutScreen = ({ workout, setWorkout, onFinishWorkout, globalSettings, w
                 <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-11/12 bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-lg z-20 flex flex-col items-center">
                     <p className="text-sm text-slate-400">Descanso ({restingExercise})</p>
                     <div className="flex items-center justify-center space-x-2 sm:space-x-4 my-2">
-                        <button onClick={() => setTimer(t => Math.max(0, t! - 15))} className="w-14 h-12 rounded-lg bg-slate-800 text-lg flex-shrink-0">-15s</button>
+                        <button onClick={() => adjustTimer(-15)} className="w-14 h-12 rounded-lg bg-slate-800 text-lg flex-shrink-0">-15s</button>
                         <p className="text-4xl sm:text-5xl font-bold w-28 text-center text-cyan-400 tabular-nums">{Math.floor(timer / 60)}:{String(timer % 60).padStart(2, '0')}</p>
-                        <button onClick={() => setTimer(t => t! + 15)} className="w-14 h-12 rounded-lg bg-slate-800 text-lg flex-shrink-0">+15s</button>
+                        <button onClick={() => adjustTimer(15)} className="w-14 h-12 rounded-lg bg-slate-800 text-lg flex-shrink-0">+15s</button>
                     </div>
-                    <button onClick={() => setTimer(0)} className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 mt-1 rounded-lg text-sm flex items-center justify-center">
+                    <button onClick={skipTimer} className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 mt-1 rounded-lg text-sm flex items-center justify-center">
                         <ICONS.SKIP className="w-4 h-4 mr-2"/> Pular
                     </button>
                 </div>
@@ -685,7 +889,8 @@ const SettingsScreen = ({ user, onUserChange, settings, onSettingsChange, onSave
                     <div className="bg-slate-900/70 p-4 rounded-xl border border-slate-700">
                         <label className="text-sm text-slate-400">Tempo de Descanso Padrão (segundos)</label>
                          <input 
-                            type="number" 
+                            type="tel" 
+                            inputMode="numeric"
                             value={settings.defaultRestTime} 
                             onChange={e => onSettingsChange({ defaultRestTime: parseInt(e.target.value, 10) || 0 })}
                             className="w-full bg-slate-800 border border-slate-600 rounded p-2 mt-1 text-slate-100" />
@@ -784,13 +989,10 @@ const App = () => {
     const handleAddNewWorkout = () => {
         const newWorkout: Workout = {
             id: `workout${Date.now()}`,
-            name: "Novo Treino",
-            description: "Adicione exercícios",
+            name: "",
+            description: "",
             exercises: [],
         };
-        const updatedWorkouts = [...workouts, newWorkout];
-        setWorkouts(updatedWorkouts);
-        localStorage.setItem('gymProWorkouts', JSON.stringify(updatedWorkouts));
         setEditingWorkout(newWorkout);
         navigateTo(Screen.EDIT_WORKOUT);
     };
@@ -800,8 +1002,28 @@ const App = () => {
         navigateTo(Screen.EDIT_WORKOUT);
     };
 
+    const handleDeleteWorkout = (workoutId: string) => {
+        if (window.confirm("Tem certeza que deseja excluir este treino permanentemente?")) {
+            const updatedWorkouts = workouts.filter(w => w.id !== workoutId);
+            setWorkouts(updatedWorkouts);
+            localStorage.setItem('gymProWorkouts', JSON.stringify(updatedWorkouts));
+        }
+    };
+
+    const handleArchiveWorkout = (workoutId: string, archive: boolean) => {
+        const updatedWorkouts = workouts.map(w =>
+            w.id === workoutId ? { ...w, isArchived: archive } : w
+        );
+        setWorkouts(updatedWorkouts);
+        localStorage.setItem('gymProWorkouts', JSON.stringify(updatedWorkouts));
+    };
+
     const handleUpdateWorkout = (updatedWorkout: Workout) => {
-        const updatedWorkouts = workouts.map(w => w.id === updatedWorkout.id ? updatedWorkout : w);
+        const workoutExists = workouts.some(w => w.id === updatedWorkout.id);
+        const updatedWorkouts = workoutExists
+            ? workouts.map(w => w.id === updatedWorkout.id ? updatedWorkout : w)
+            : [...workouts, updatedWorkout];
+
         setWorkouts(updatedWorkouts);
         localStorage.setItem('gymProWorkouts', JSON.stringify(updatedWorkouts));
         setEditingWorkout(null);
@@ -857,9 +1079,10 @@ const App = () => {
         const summary = currentWorkout.exercises.reduce((acc, exercise) => {
             exercise.sets.forEach(set => {
                 if (set.isDone) {
+                    const totalReps = parseRepsStringToNumber(set.reps);
                     acc.completedSets++;
-                    acc.totalReps += set.reps;
-                    acc.totalVolume += set.weight * set.reps;
+                    acc.totalReps += totalReps;
+                    acc.totalVolume += set.weight * totalReps;
                 }
             });
             return acc;
@@ -907,10 +1130,10 @@ const App = () => {
         currentWorkout.exercises.forEach(finishedEx => {
             const completedSets = finishedEx.sets.filter(s => s.isDone);
             if (completedSets.length === 0) return;
-            const exerciseVolume = completedSets.reduce((sum, set) => sum + (set.weight * set.reps), 0);
+            const exerciseVolume = completedSets.reduce((sum, set) => sum + (set.weight * parseRepsStringToNumber(set.reps)), 0);
             const heaviestSet = completedSets.reduce((heaviest, current) => (current.weight > heaviest.weight ? current : heaviest), completedSets[0]);
 
-            const progressDataPoint: ProgressDataPoint = { date: today.split('T')[0], weight: heaviestSet.weight, reps: heaviestSet.reps, volume: exerciseVolume };
+            const progressDataPoint: ProgressDataPoint = { date: today.split('T')[0], weight: heaviestSet.weight, reps: parseRepsStringToNumber(heaviestSet.reps), volume: exerciseVolume };
 
             let exerciseProgressIndex = newProgress.findIndex(p => p.exerciseId === finishedEx.id);
             if (exerciseProgressIndex > -1) {
@@ -948,7 +1171,7 @@ const App = () => {
 
         const volumeByMuscleGroup = new Map<string, number>();
         currentWorkout.exercises.forEach(ex => {
-            const exerciseVolume = ex.sets.filter(s => s.isDone).reduce((sum, set) => sum + (set.weight * set.reps), 0);
+            const exerciseVolume = ex.sets.filter(s => s.isDone).reduce((sum, set) => sum + (set.weight * parseRepsStringToNumber(set.reps)), 0);
             if (exerciseVolume > 0) {
                 const currentVolume = volumeByMuscleGroup.get(ex.muscleGroup) || 0;
                 volumeByMuscleGroup.set(ex.muscleGroup, currentVolume + exerciseVolume);
@@ -1007,9 +1230,18 @@ const App = () => {
     const renderScreen = () => {
         switch (activeScreen) {
             case Screen.HOME:
-                return <HomeScreen user={user} workout={workouts[0]} alerts={alerts} onStartWorkout={() => handleStartWorkout(workouts[0])} onNavigate={navigateTo} />;
+                const activeWorkouts = workouts.filter((w: Workout) => !w.isArchived);
+                const nextWorkout = activeWorkouts.length > 0 ? activeWorkouts[0] : workouts[0];
+                return <HomeScreen user={user} workout={nextWorkout} alerts={alerts} onStartWorkout={() => handleStartWorkout(nextWorkout)} onNavigate={navigateTo} />;
             case Screen.WORKOUTS:
-                return <WorkoutsListScreen workouts={workouts} onStartWorkout={handleStartWorkout} onAddNewWorkout={handleAddNewWorkout} onEditWorkout={handleEditWorkout} />;
+                return <WorkoutsListScreen 
+                    workouts={workouts} 
+                    onStartWorkout={handleStartWorkout} 
+                    onAddNewWorkout={handleAddNewWorkout} 
+                    onEditWorkout={handleEditWorkout}
+                    onDeleteWorkout={handleDeleteWorkout}
+                    onArchiveWorkout={handleArchiveWorkout} 
+                    />;
             case Screen.EDIT_WORKOUT:
                 if (!editingWorkout) {
                     navigateTo(Screen.WORKOUTS);
@@ -1033,7 +1265,8 @@ const App = () => {
             case Screen.SETTINGS:
                 return <SettingsScreen user={tempUser} onUserChange={setTempUser} settings={tempSettings} onSettingsChange={setTempSettings} onSave={handleSaveSettings} onResetData={handleResetData} />;
             default:
-                return <HomeScreen user={user} workout={workouts[0]} alerts={alerts} onStartWorkout={() => handleStartWorkout(workouts[0])} onNavigate={navigateTo} />;
+                 const defaultWorkout = workouts.filter((w: Workout) => !w.isArchived)[0] || workouts[0];
+                return <HomeScreen user={user} workout={defaultWorkout} alerts={alerts} onStartWorkout={() => handleStartWorkout(defaultWorkout)} onNavigate={navigateTo} />;
         }
     };
     
@@ -1052,8 +1285,8 @@ const App = () => {
 
                 {showWorkoutSummary && workoutSummary && workoutFeedback && (
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 text-white text-center p-4">
-                        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm flex flex-col items-center">
-                            <ICONS.CHECK className="w-16 h-16 text-green-500 bg-green-500/10 rounded-full p-3 mb-4" />
+                        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm flex flex-col items-center max-h-[90vh] overflow-y-auto">
+                            <ICONS.CHECK className="w-16 h-16 text-green-500 bg-green-500/10 rounded-full p-3 mb-4 flex-shrink-0" />
                             <h2 className="text-3xl font-bold mb-2 text-cyan-400">{workoutFeedback.title}</h2>
                             <p className="text-slate-300 mb-6">{workoutFeedback.message}</p>
                             <div className="grid grid-cols-2 gap-y-4 text-lg w-full mb-6 text-left">
@@ -1077,13 +1310,14 @@ const App = () => {
                             <div className="w-full mt-2">
                                 <label className="text-sm text-slate-400 text-left block mb-1">Calorias Queimadas (Opcional)</label>
                                 <input 
-                                    type="number" 
+                                    type="tel" 
+                                    inputMode="numeric"
                                     value={caloriesInput}
                                     onChange={(e) => setCaloriesInput(e.target.value)}
                                     placeholder="Ex: 350"
                                     className="w-full bg-slate-800 border border-slate-600 rounded p-2 text-slate-100 text-center" />
                             </div>
-                            <button onClick={handleConfirmWorkoutSummary} className="w-full bg-cyan-600 hover:bg-cyan-700 font-bold py-3 mt-6 rounded-xl transition-all duration-300">
+                            <button onClick={handleConfirmWorkoutSummary} className="w-full bg-cyan-600 hover:bg-cyan-700 font-bold py-3 mt-6 rounded-xl transition-all duration-300 flex-shrink-0">
                                 Concluir
                             </button>
                         </div>

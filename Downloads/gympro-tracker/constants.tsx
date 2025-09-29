@@ -29,6 +29,12 @@ export const ICONS = {
     CHEVRON_LEFT: (props: React.SVGProps<SVGSVGElement>) => (
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="15 18 9 12 15 6"></polyline></svg>
     ),
+    CHEVRON_UP: (props: React.SVGProps<SVGSVGElement>) => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="18 15 12 9 6 15"></polyline></svg>
+    ),
+    CHEVRON_DOWN: (props: React.SVGProps<SVGSVGElement>) => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="6 9 12 15 18 9"></polyline></svg>
+    ),
     WARNING: (props: React.SVGProps<SVGSVGElement>) => (
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
     ),
@@ -45,10 +51,19 @@ export const ICONS = {
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
     ),
     SETTINGS: (props: React.SVGProps<SVGSVGElement>) => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.12l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1 0-2.12l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.12l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1 0 2.12l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
     ),
     HISTORY: (props: React.SVGProps<SVGSVGElement>) => (
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg>
+    ),
+    MORE_VERTICAL: (props: React.SVGProps<SVGSVGElement>) => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+    ),
+    ARCHIVE: (props: React.SVGProps<SVGSVGElement>) => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"></path><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+    ),
+    UNARCHIVE: (props: React.SVGProps<SVGSVGElement>) => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"></path><rect x="1" y="3" width="22" height="5"></rect><polyline points="10 12 12 10 14 12"></polyline><line x1="12" y1="10" x2="12" y2="16"></line></svg>
     ),
 };
 
@@ -62,10 +77,10 @@ export const MOCK_WORKOUT_A: Workout = {
     name: "Treino A",
     description: "Peito & Tríceps",
     exercises: [
-        { id: "ex1", name: "Supino Reto", lastLoad: 80, muscleGroup: "Peito", sets: [{id:1, weight: 80, reps: 8, isDone: false}, {id:2, weight: 80, reps: 8, isDone: false}, {id:3, weight: 80, reps: 6, isDone: false}, {id:4, weight: 75, reps: 10, isDone: false}], suggestion: { text: "Tente 82.5kg", visible: true }, restTime: 90 },
-        { id: "ex2", name: "Supino Inclinado c/ Halteres", lastLoad: 30, muscleGroup: "Peito", sets: [{id:1, weight: 30, reps: 10, isDone: false}, {id:2, weight: 30, reps: 10, isDone: false}, {id:3, weight: 28, reps: 12, isDone: false}] },
-        { id: "ex3", name: "Tríceps Pulley", lastLoad: 40, muscleGroup: "Tríceps", sets: [{id:1, weight: 40, reps: 12, isDone: false}, {id:2, weight: 40, reps: 12, isDone: false}, {id:3, weight: 35, reps: 15, isDone: false}] },
-        { id: "ex4", name: "Flexão de Braço", lastLoad: 0, muscleGroup: "Peito", sets: [{id:1, weight: 0, reps: 15, isDone: false}, {id:2, weight: 0, reps: 15, isDone: false}, {id:3, weight: 0, reps: 12, isDone: false}]},
+        { id: "ex1", name: "Supino Reto", lastLoad: 80, muscleGroup: "Peito", sets: [{id:1, weight: 80, reps: '8', isDone: false}, {id:2, weight: 80, reps: '8', isDone: false}, {id:3, weight: 80, reps: '6', isDone: false}, {id:4, weight: 75, reps: '10', isDone: false}], suggestion: { text: "Tente 82.5kg", visible: true }, restTime: 90 },
+        { id: "ex2", name: "Supino Inclinado c/ Halteres", lastLoad: 30, muscleGroup: "Peito", sets: [{id:1, weight: 30, reps: '10', isDone: false}, {id:2, weight: 30, reps: '10', isDone: false}, {id:3, weight: 28, reps: '12', isDone: false}] },
+        { id: "ex3", name: "Tríceps Pulley", lastLoad: 40, muscleGroup: "Tríceps", sets: [{id:1, weight: 40, reps: '12', isDone: false}, {id:2, weight: 40, reps: '12', isDone: false}, {id:3, weight: 35, reps: '15', isDone: false}] },
+        { id: "ex4", name: "Flexão de Braço", lastLoad: 0, muscleGroup: "Peito", sets: [{id:1, weight: 0, reps: '15', isDone: false}, {id:2, weight: 0, reps: '15', isDone: false}, {id:3, weight: 0, reps: '12', isDone: false}]},
     ]
 };
 
@@ -74,9 +89,9 @@ export const MOCK_WORKOUT_B: Workout = {
     name: "Treino B",
     description: "Costas & Bíceps",
     exercises: [
-        { id: "ex5", name: "Barra Fixa", lastLoad: 0, muscleGroup: "Costas", sets: [{id:1, weight: 0, reps: 8, isDone: false}, {id:2, weight: 0, reps: 8, isDone: false}, {id:3, weight: 0, reps: 6, isDone: false}] },
-        { id: "ex6", name: "Remada Curvada", lastLoad: 60, muscleGroup: "Costas", sets: [{id:1, weight: 60, reps: 10, isDone: false}, {id:2, weight: 60, reps: 10, isDone: false}, {id:3, weight: 60, reps: 10, isDone: false}] },
-        { id: "ex7", name: "Rosca Direta", lastLoad: 14, muscleGroup: "Bíceps", sets: [{id:1, weight: 14, reps: 12, isDone: false}, {id:2, weight: 14, reps: 12, isDone: false}, {id:3, weight: 12, reps: 15, isDone: false}] },
+        { id: "ex5", name: "Barra Fixa", lastLoad: 0, muscleGroup: "Costas", sets: [{id:1, weight: 0, reps: '8', isDone: false}, {id:2, weight: 0, reps: '8', isDone: false}, {id:3, weight: 0, reps: '6', isDone: false}] },
+        { id: "ex6", name: "Remada Curvada", lastLoad: 60, muscleGroup: "Costas", sets: [{id:1, weight: 60, reps: '10', isDone: false}, {id:2, weight: 60, reps: '10', isDone: false}, {id:3, weight: 60, reps: '10', isDone: false}] },
+        { id: "ex7", name: "Rosca Direta", lastLoad: 14, muscleGroup: "Bíceps", sets: [{id:1, weight: 14, reps: '12', isDone: false}, {id:2, weight: 14, reps: '12', isDone: false}, {id:3, weight: 12, reps: '15', isDone: false}] },
     ]
 };
 
@@ -85,9 +100,9 @@ export const MOCK_WORKOUT_C: Workout = {
     name: "Treino C",
     description: "Pernas & Ombros",
     exercises: [
-        { id: "ex8", name: "Agachamento Livre", lastLoad: 100, muscleGroup: "Pernas", sets: [{id:1, weight: 100, reps: 5, isDone: false}, {id:2, weight: 100, reps: 5, isDone: false}, {id:3, weight: 100, reps: 5, isDone: false}], restTime: 120 },
-        { id: "ex9", name: "Leg Press", lastLoad: 180, muscleGroup: "Pernas", sets: [{id:1, weight: 180, reps: 10, isDone: false}, {id:2, weight: 180, reps: 10, isDone: false}, {id:3, weight: 180, reps: 10, isDone: false}] },
-        { id: "ex10", name: "Desenvolvimento c/ Halteres", lastLoad: 20, muscleGroup: "Ombros", sets: [{id:1, weight: 20, reps: 12, isDone: false}, {id:2, weight: 20, reps: 10, isDone: false}, {id:3, weight: 18, reps: 12, isDone: false}] },
+        { id: "ex8", name: "Agachamento Livre", lastLoad: 100, muscleGroup: "Pernas", sets: [{id:1, weight: 100, reps: '5', isDone: false}, {id:2, weight: 100, reps: '5', isDone: false}, {id:3, weight: 100, reps: '5', isDone: false}], restTime: 120 },
+        { id: "ex9", name: "Leg Press", lastLoad: 180, muscleGroup: "Pernas", sets: [{id:1, weight: 180, reps: '10', isDone: false}, {id:2, weight: 180, reps: '10', isDone: false}, {id:3, weight: 180, reps: '10', isDone: false}] },
+        { id: "ex10", name: "Desenvolvimento c/ Halteres", lastLoad: 20, muscleGroup: "Ombros", sets: [{id:1, weight: 20, reps: '12', isDone: false}, {id:2, weight: 20, reps: '10', isDone: false}, {id:3, weight: 18, reps: '12', isDone: false}] },
     ]
 };
 
@@ -98,49 +113,49 @@ export const MOCK_WORKOUT_LEGS_USER: Workout = {
     exercises: [
         {
             id: "ex11", name: "Esteira", lastLoad: 0, muscleGroup: "Cardio", sets: [
-                { id: 1, weight: 0, reps: 10, isDone: false }
+                { id: 1, weight: 0, reps: '10', isDone: false }
             ], restTime: 60
         },
         {
             id: "ex12", name: "Leg Press", lastLoad: 150, muscleGroup: "Pernas", sets: [
-                { id: 1, weight: 150, reps: 8, isDone: false },
-                { id: 2, weight: 150, reps: 10, isDone: false },
-                { id: 3, weight: 150, reps: 12, isDone: false }
+                { id: 1, weight: 150, reps: '8', isDone: false },
+                { id: 2, weight: 150, reps: '10', isDone: false },
+                { id: 3, weight: 150, reps: '12', isDone: false }
             ], restTime: 60
         },
         {
             id: "ex13", name: "Agachamento Smith", lastLoad: 28, muscleGroup: "Pernas", sets: [
-                { id: 1, weight: 28, reps: 8, isDone: false },
-                { id: 2, weight: 25, reps: 10, isDone: false },
-                { id: 3, weight: 20, reps: 12, isDone: false }
+                { id: 1, weight: 28, reps: '8', isDone: false },
+                { id: 2, weight: 25, reps: '10', isDone: false },
+                { id: 3, weight: 20, reps: '12', isDone: false }
             ], restTime: 60
         },
         {
             id: "ex14", name: "Afundo", lastLoad: 0, muscleGroup: "Pernas", sets: [
-                { id: 1, weight: 0, reps: 8, isDone: false },
-                { id: 2, weight: 0, reps: 10, isDone: false },
-                { id: 3, weight: 0, reps: 12, isDone: false }
+                { id: 1, weight: 0, reps: '8', isDone: false },
+                { id: 2, weight: 0, reps: '10', isDone: false },
+                { id: 3, weight: 0, reps: '12', isDone: false }
             ], restTime: 60
         },
         {
             id: "ex15", name: "Cadeira Extensora", lastLoad: 50, muscleGroup: "Pernas", sets: [
-                { id: 1, weight: 50, reps: 8, isDone: false },
-                { id: 2, weight: 45, reps: 10, isDone: false },
-                { id: 3, weight: 40, reps: 12, isDone: false }
+                { id: 1, weight: 50, reps: '8', isDone: false },
+                { id: 2, weight: 45, reps: '10', isDone: false },
+                { id: 3, weight: 40, reps: '12', isDone: false }
             ], restTime: 60
         },
         {
             id: "ex16", name: "Cadeira Flexora", lastLoad: 45, muscleGroup: "Pernas", sets: [
-                { id: 1, weight: 45, reps: 8, isDone: false },
-                { id: 2, weight: 40, reps: 10, isDone: false },
-                { id: 3, weight: 35, reps: 12, isDone: false }
+                { id: 1, weight: 45, reps: '8', isDone: false },
+                { id: 2, weight: 40, reps: '10', isDone: false },
+                { id: 3, weight: 35, reps: '12', isDone: false }
             ], restTime: 60
         },
         {
             id: "ex17", name: "Panturrilha Leg Press", lastLoad: 75, muscleGroup: "Pernas", sets: [
-                { id: 1, weight: 75, reps: 10, isDone: false },
-                { id: 2, weight: 75, reps: 12, isDone: false },
-                { id: 3, weight: 75, reps: 14, isDone: false }
+                { id: 1, weight: 75, reps: '10', isDone: false },
+                { id: 2, weight: 75, reps: '12', isDone: false },
+                { id: 3, weight: 75, reps: '14', isDone: false }
             ], restTime: 60
         }
     ]
